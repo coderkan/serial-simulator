@@ -1,5 +1,8 @@
 import java.awt.EventQueue;
 import com.fazecast.jSerialComm.*;
+
+import rxtx.Serial232;
+
 import javax.swing.JFrame;
 import javax.swing.JComboBox;
 import javax.swing.JFormattedTextField;
@@ -80,6 +83,13 @@ public class PIOSimulator implements PIOSimulatorView{
 		btnRefresh.setBounds(475, 109, 89, 22);
 		frame.getContentPane().add(btnRefresh);
 		
+		
+		
+		JComboBox<String> comboBaudRate = new JComboBox<String>();
+		comboBaudRate.setBounds(475, 78, 89, 20);
+		frame.getContentPane().add(comboBaudRate);
+		
+		
 		JButton btnDisconnect = new JButton("Disconnect");
 		btnDisconnect.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
@@ -100,11 +110,16 @@ public class PIOSimulator implements PIOSimulatorView{
 				System.out.println("Index: " + index);
 				if(index != -1 && !isConnected) {
 					SerialPort port = serialPorts[index];
-					isConnected = port.openPort();
+					new Serial232().connect(port.getSystemPortName(), comboBaudRate.getSelectedItem().toString());
+					//isConnected = port.openPort();
+					/*
 					if(!isConnected) {
 						chckbxStatus.setSelected(isConnected);
 						return;
 					}
+					*/
+					
+					/*
 					mCurrentPort = port;
 					
 					mCurrentPort.setBaudRate(9600);
@@ -113,6 +128,7 @@ public class PIOSimulator implements PIOSimulatorView{
 					mCurrentPort.addDataListener(listener);
 					
 					chckbxStatus.setSelected(isConnected);
+					*/
 				}
 			}
 		});
@@ -123,10 +139,7 @@ public class PIOSimulator implements PIOSimulatorView{
 		chckbxStatus.setSelected(isConnected);	
 		
 		refreshPorts(comboBox);
-		
-		JComboBox<String> comboBaudRate = new JComboBox<String>();
-		comboBaudRate.setBounds(475, 78, 89, 20);
-		frame.getContentPane().add(comboBaudRate);
+	
 		
 		textSlaveAddress = new JTextField();
 		textSlaveAddress.setBounds(104, 18, 152, 20);
