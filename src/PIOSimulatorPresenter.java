@@ -34,28 +34,39 @@ public class PIOSimulatorPresenter {
 		}
 			
 		String[] bytes = values.split(",");
-		int _length = bytes.length + 2;
+		int _length = bytes.length + 2 + 2 ; // CRC Check bytes
 		byte[] vals = new byte[_length];	
 		
 		vals[0] = getByte(this.view.getTextSlaveAddress().getText().trim().toString());
 		vals[1] = getByte(this.view.getTextFunctionValue().getText().trim().toString());
-		for(int i = 2, j = 0; i < _length; i++, j++) {
+		for(int i = 2, j = 0; i < _length - 2; i++, j++) {
 			String string = bytes[j];
 			vals[i] = getByte(string);
 			System.out.println("Bytes: " + string + "  ::  " + vals[i] ) ;			
 		}
-		/*
-		char[] vals = new char[_length];
-		int _v = 0;
-		for(int i = 0; i < _length; i++) {
-			String string = bytes[i];
-			int _int = Integer.parseInt(string);
-			char c = (char)_int;
-			vals[i] = c;
-			System.out.println("Bytes: " + string + "  ::  " + c ) ;			
-		}
-		*/
+ 
+		// CrcCheck and send
 		
+		CRC16 crc = new CRC16();
+		for(int i = 0; i < vals.length-2; i++) {
+			crc.update(vals[i]);
+		}
+		 
+        System.out.println(Integer.toHexString((int) crc.getValue()));
+        byte[] byteStr = new byte[2];
+        byteStr[0] = (byte) ((crc.getValue() & 0x000000ff));
+        byteStr[1] = (byte) ((crc.getValue() & 0x0000ff00) >>> 8);
+
+        System.out.printf("%02X :: %02X\n", byteStr[0], byteStr[1]);
+        int len = vals.length;
+		vals[len-2] = byteStr[0];
+		vals[len-1] = byteStr[1];
+		
+		for(int i = 0; i < vals.length; i++) {
+			System.out.println("::::: " + vals[i]);
+		}
+        
+        
 		this.view.getCurrentPort().writeBytes(vals, vals.length);
 		
 	}
