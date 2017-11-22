@@ -8,11 +8,15 @@ import javax.swing.JComboBox;
 import javax.swing.JFormattedTextField;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
+
 import javax.swing.JButton;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.nio.ByteBuffer;
 import java.text.NumberFormat;
+import java.util.List;
 import java.awt.event.ActionEvent;
 import javax.swing.JCheckBox;
 import javax.swing.JTextField;
@@ -37,6 +41,9 @@ public class PIOSimulator implements PIOSimulatorView {
 	private JCheckBox chckbxStatus;
 	private String recievedData;
 	private JTextArea textFieldRecievedData = null;
+	public static boolean autoSend = false;
+	public static Packet autoPacket = null;
+	private JComboBox<String> comboBaudRate = null;
 
 	/**
 	 * Launch the application.
@@ -68,6 +75,7 @@ public class PIOSimulator implements PIOSimulatorView {
 		frame = new JFrame();
 		frame.setBounds(100, 100, 593, 406);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setResizable(false);
 		frame.getContentPane().setLayout(null);
 
 		if (presenter == null)
@@ -97,13 +105,33 @@ public class PIOSimulator implements PIOSimulatorView {
 
 		chckbxStatus = new JCheckBox("Status");
 		chckbxStatus.setBounds(475, 17, 89, 23);
+		chckbxStatus.setEnabled(false);
 		frame.getContentPane().add(chckbxStatus);
 
+		comboBaudRate = new JComboBox<String>();
+		comboBaudRate.setBounds(475, 78, 89, 20);
+		frame.getContentPane().add(comboBaudRate);
+		
 		JButton btnConnect = new JButton("Connect");
 		btnConnect.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				int index = comboBox.getSelectedIndex();
 				System.out.println("Index: " + index);
+				
+				if(index != -1 && isConnected) {
+					mCurrentPort.removeDataListener();
+					if (!isConnected) {
+						chckbxStatus.setSelected(isConnected);
+						return;
+					}
+					
+					mCurrentPort.setBaudRate(Integer.parseInt(comboBaudRate.getSelectedItem().toString()));
+					mCurrentPort.addDataListener(dataListener);
+					chckbxStatus.setSelected(isConnected);
+					return;
+				}
+				
+				
 				if (index != -1 && !isConnected) {
 					SerialPort port = serialPorts[index];
 					isConnected = port.openPort();
@@ -112,12 +140,12 @@ public class PIOSimulator implements PIOSimulatorView {
 						return;
 					}
 					mCurrentPort = port;
-
-					mCurrentPort.setBaudRate(9600);
-					// mCurrentPort.setComPortTimeouts(SerialPort.TIMEOUT_NONBLOCKING, 0, 0);
+					
+					mCurrentPort.setBaudRate(Integer.parseInt(comboBaudRate.getSelectedItem().toString()));
 					mCurrentPort.addDataListener(dataListener);
 					chckbxStatus.setSelected(isConnected);
 				}
+				
 			}
 		});
 		btnConnect.setBounds(475, 142, 89, 23);
@@ -127,17 +155,13 @@ public class PIOSimulator implements PIOSimulatorView {
 		chckbxStatus.setSelected(isConnected);
 
 		refreshPorts(comboBox);
-
-		JComboBox<String> comboBaudRate = new JComboBox<String>();
-		comboBaudRate.setBounds(475, 78, 89, 20);
-		frame.getContentPane().add(comboBaudRate);
-
+		
 		textSlaveAddress = new JTextField();
 		textSlaveAddress.setBounds(104, 18, 152, 20);
 		frame.getContentPane().add(textSlaveAddress);
 		textSlaveAddress.setColumns(10);
 		textSlaveAddress.addKeyListener(onlyNumberAdapter);
-		textSlaveAddress.setText("10");
+		textSlaveAddress.setText("4");
 
 		JLabel lblSlaveAddress = new JLabel("Slave Address:");
 		lblSlaveAddress.setBounds(10, 21, 89, 14);
@@ -176,10 +200,6 @@ public class PIOSimulator implements PIOSimulatorView {
 
 		textFieldRecievedData = new JTextArea();
 		textFieldRecievedData.setEditable(false);
-		String str = "";
-		for (int i = 0; i < 50; ++i)
-			str += "Some text\n";
-		// textField.setText(str);
 
 		JScrollPane scroll = new JScrollPane(textFieldRecievedData);
 		scroll.setBounds(21, 160, 235, 160);
@@ -198,25 +218,33 @@ public class PIOSimulator implements PIOSimulatorView {
 		});
 		btnNewButton.setBounds(104, 331, 152, 23);
 		frame.getContentPane().add(btnNewButton);
+		
+		JButton btnPacket_1 = new JButton("F0x01");
+		btnPacket_1.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				presenter.sendWithPacket(Function.F0x01);
+			}
+		});
+		btnPacket_1.setBounds(266, 157, 89, 23);
+		frame.getContentPane().add(btnPacket_1);
+		
+		JButton btnFxauto = new JButton("F0x01_A");
+		btnFxauto.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				if(!autoSend)
+					presenter.sendWithPacket(Function.F0x01_A);
+				else
+					autoSend = false;
+			}
+		});
+		btnFxauto.setBounds(266, 188, 89, 23);
+		frame.getContentPane().add(btnFxauto);
 
-		String[] baudRates = new String[] { "1200", "9600", "19200", "38400", "57600", "115200" };
+		String[] baudRates = new String[] { "1200", "9600", "19200", "38400", "57600", "115200", "921600" };
 		for (String string : baudRates) {
 			comboBaudRate.addItem(string);
 		}
-
-		/*
-		 * CRC16 crc = new CRC16();
-		 * 
-		 * byte[] bt = new byte[] { 0x04, 0x02, 0x02, 0x0A, 0x11 }; for(byte b: bt) {
-		 * crc.update(b); }
-		 * 
-		 * System.out.println(Integer.toHexString((int) crc.getValue())); byte[] byteStr
-		 * = new byte[2]; byteStr[0] = (byte) ((crc.getValue() & 0x000000ff));
-		 * byteStr[1] = (byte) ((crc.getValue() & 0x0000ff00) >>> 8);
-		 * 
-		 * System.out.printf("%02X :: %02X\n", byteStr[0], byteStr[1]);
-		 */
-
+		comboBaudRate.setSelectedIndex(1);
 	}
 
 	private KeyAdapter notOnlyAdapter = new KeyAdapter() {
@@ -259,8 +287,6 @@ public class PIOSimulator implements PIOSimulatorView {
 	public void closePort() {
 		if (this.mCurrentPort != null && this.mCurrentPort.isOpen()) {
 			try {
-
-				// this.mCurrentPort.setComPortTimeouts(SerialPort.TIMEOUT_SCANNER, 0, 0);
 				Thread.sleep(1000);
 				this.mCurrentPort.removeDataListener();
 				if (this.mCurrentPort.closePort()) {
@@ -297,6 +323,8 @@ public class PIOSimulator implements PIOSimulatorView {
 	private SerialPortDataListener dataListener = new SerialPortDataListener() {
 
 		private int val = 0;
+		private Packet mPacket = new Packet();
+		private int counter = 0;
 
 		@Override
 		public int getListeningEvents() {
@@ -320,10 +348,42 @@ public class PIOSimulator implements PIOSimulatorView {
 					String str = "";
 					for (int i = 0; i < numRead; i++) {
 						str += " : " + newData[i];
+						mPacket.addByte(newData[i]);
 					}
+			
 					str += "\n";
 					recievedData += str;
 					textFieldRecievedData.setText(recievedData);
+					if(recievedData.length() > 1200)
+						recievedData = "";
+					
+					if(mPacket.getByteArray().length >= 5) {
+						if(PIOSimulator.autoSend) {
+							if(mPacket.getByteArray()[0] == PIOSimulator.autoPacket.getByteArray()[0]) {
+								
+								/*Byte bt = PIOSimulator.autoPacket.getByteList().get(0);
+								byte btByte = bt.byteValue();
+								btByte +=1;
+								if(btByte > 0x06) {
+									btByte = 0x04;
+								}
+								Byte b = btByte;
+								PIOSimulator.autoPacket.getByteList().add(0, b);
+								PIOSimulator.autoPacket.crc16_2();
+								*/
+								/*
+								if(counter++ > 5) {
+									PIOSimulator.autoSend = false;
+									counter = 0;
+								}
+								*/
+	
+								PIOSimulator.autoPacket.send();
+								//mPacket.send();
+							}
+						}
+						mPacket.getByteList().clear();
+					}
 				}
 				return;
 			}
